@@ -1,6 +1,6 @@
 from ctypes import *
-from memorpy import *
 from pydbg import *
+from memorpy import *
 import time
 import win32api
 import thread
@@ -43,7 +43,7 @@ rcsEnabled = True
 maxSoundESPDistance = 780  # Default: 780, decent distance tbh
 RCSPerfectPercent = 100  # Percent of RCS being perfect, 100% = perfect RCS
 triggerBotKey = 0x12  # Default: right-click
-triggerBotRandomMinimum = 0  # Minimum miliseconds to wait before shooting, there is a random int between 0-50 added to this in the code
+triggerBotRandomMinimum = 1  # Minimum miliseconds to wait before shooting, there is a random int between 0-50 added to this in the code
 
 # OPTIONS END #
 
@@ -60,6 +60,7 @@ def triggerBot(process, client, clientState):
     global end
     global csgoWindow
     while not end:  # This function is threaded so might as well do this :>
+        time.sleep(0.1)
         if not win32gui.GetForegroundWindow():
             continue
         if win32gui.GetForegroundWindow() == csgoWindow:
@@ -88,7 +89,8 @@ def triggerBot(process, client, clientState):
                         crossHairID = read(process, (
                             localPlayer + crossHairIDOffset))  # Re-get the crosshair ID to check if maybe no longer an entity in my crosshair
                         write(process, (client + forceAttackOffset), 5, 'int')  # Shoot
-                        #write(process, (client + forceAttackOffset), 4, 'int')  # Stop shooting
+                        time.sleep(0.1)
+                        write(process, (client + forceAttackOffset), 4, 'int')# Stop shooting
 
 
 # normalizeAngles: Normalize a pair of angles
