@@ -12,9 +12,9 @@ import admin
 
 # OFFSET START #
 crossHairIDOffset = 0xAA70
-forceAttackOffset = 0x2F0F800
-forceJumpOffset = 0x4F66400
-clientStateOffset = 0x5CA524
+forceAttackOffset = 0x2F108C0
+forceJumpOffset = 0x4F6746C
+clientStateOffset = 0x5CB524
 clientStateViewAnglesOffset = 0x4D0C
 aimPunchOffset = 0x301C
 clientStateInGameOffset = 0x100
@@ -22,10 +22,10 @@ flagsOffset = 0x100
 vecOriginOffset = 0x134
 shotsFiredOffset = 0xA2C0
 boneMatrix = 0x2698
-entityListOffset = 0x4ACF844
+entityListOffset = 0x4AD0884
 localPlayerIndexOffset = 0x178
-localPlayerOffset = 0xAAC6EC
-glowObjectOffset = 0x4FEA32C
+localPlayerOffset = 0xAAD704
+glowObjectOffset = 0x4FEB37C
 glowIndexOffset = 0xA320
 teamNumOffset = 0xF0
 dormantOffset = 0xE9
@@ -112,7 +112,6 @@ def glowESP(process, client):
     glowLocalBase = read(process, (client + localPlayerOffset))  # Get the localPlayer
     glowPointer = read(process, (client + glowObjectOffset))  # Get the glow Pointer
     myTeamID = read(process, (glowLocalBase + teamNumOffset))  # Get the localPlayer team ID
-
     playerCount = read(process, (client + glowObjectOffset + 0x4))
     for i in range(1, playerCount):  # For each player until the max players available
         glowCurrentPlayer = read(process, (
