@@ -15,7 +15,7 @@ import os.path
 maxSoundESPDistance = 780  # Default: 780, decent distance tbh
 RCSPerfectPercent = 100  # Percent of RCS being perfect, 100% = perfect RCS
 triggerBotKey = 0x12  # Default: right-click
-triggerBotRandomMinimum = 1  # Minimum miliseconds to wait before shooting, there is a random int between 0-50 added to this in the code
+triggerBotDelay = 1  # ms
 
 foundProcess = False
 end = False
@@ -25,6 +25,61 @@ proc = None
 
 config = ConfigParser(allow_no_value=True)
 config.read('settings.ini')
+
+class Entity(Structure):
+    _fields_ = [
+        ("dwBase", c_long),
+        ("hp",c_int),
+        ("team",c_int),
+        ("is_dormant",c_bool),
+        ("is_alive",c_bool),
+        ("weapon_ammo",c_int)
+    ]
+
+global players
+global me
+players = list()
+for i in range(130):
+    players.append(Entity())
+me = players[129]
+
+def update(process,client):
+    playerBase = read(process,(client+getOffset(config,'localPlayerOffset')))
+    updateEntityData(process,me,playerBase)
+    playerCount = read(process, (client + getOffset(config, 'glowObjectOffset') + 0x4))
+    for cp in range(playerCount):
+        entBase = read(process,(client+getOffset(config,'entityListOffset')+cp*0x10))
+        if (entBase == 0x0):
+            continue
+        updateEntityData(process,players[cp],entBase)
+    return True
+
+def updateEntityData(process,e,base):
+    dormant = read(process,(base+getOffset(config,'dormantOffset')))
+    e.dwBase = base
+    e.hp = read(process,(base+getOffset(config,'healthOffset')))
+    e.team = read(process,(base+getOffset(config,'teamNumOffset')))
+    if(dormant==1):
+        e.is_dormant = True
+    else:
+        e.is_dormant = False
+    if e.hp>0 and e.team>1 and e.team<4:
+        e.is_alive = True
+    else:
+        e.is_alive = False
+
+
+def noFlash(process,client,clientState):
+    global end
+    global csgoWindow
+    while not end:
+        time.sleep(0.1)
+        if not win32gui.GetForegroundWindow():
+            continue
+        if win32gui.GetForegroundWindow() == csgoWindow:
+            if read(process, (clientState + getOffset(config,'clientStateInGameOffset'))) == 6:  # If the client is in game
+                localPlayer = me.dwBase
+                write(process,(localPlayer+getOffset(config,'flashDurationOffset')),0.0,'float') #flashduration set 0
 
 
 # triggerBot: if entity in crosshair is an enemy, fire with a random delay between triggerBotRandomMinimum miliseconds to triggerBotRandomMinimum + 50 miliseconds
@@ -37,8 +92,8 @@ def triggerBot(process, client, clientState):
             continue
         if win32gui.GetForegroundWindow() == csgoWindow:
             if read(process, (clientState + getOffset(config,'clientStateInGameOffset'))) == 6:  # If the client is in game
-                localPlayer = read(process, (client + getOffset(config,'localPlayerOffset')))  # Get LocalPlayer
-                localPlayerTeam = read(process, (localPlayer + getOffset(config,'teamNumOffset')))  # Get the team of the LocalPlayer
+                localPlayer = me.dwBase
+                localPlayerTeam = me.team
                 crossHairID = read(process, (localPlayer + getOffset(config,'crossHairIDOffset')))  # Get the Entity ID of the entity in crosshairs
                 if crossHairID == 0:  # If no entity in crosshair
                     continue
@@ -55,7 +110,7 @@ def triggerBot(process, client, clientState):
 
                 #if win32api.GetAsyncKeyState(triggerBotKey) and localPlayerTeam != crossEntityTeam and crossEntityDormant == 0:  # if triggerBotKey is held, the localPlayers team is not equal to entity in crosshair's team, and if the entity in crosshair is not dormant
                 if  localPlayerTeam != crossEntityTeam and crossEntityDormant == 0:
-                    time.sleep((triggerBotRandomMinimum + 1) / 1000.0)  # Sleep for random delay between triggerBotRandomMinimum miliseconds to triggerBotRandomMinimum + 50 miliseconds
+                    time.sleep(triggerBotDelay/100)  # Sleep for triggerBotDelay
                     #while crossHairID != 0 and win32api.GetAsyncKeyState(triggerBotKey):  # while there is an entity in my crosshairs and my triggerbot key is held down
                     while crossHairID != 0:
                         crossHairID = read(process, (
@@ -78,56 +133,51 @@ def normalizeAngles(viewAngleX, viewAngleY):
 
     return viewAngleX, viewAngleY
 
+def drawGlow(process,glowPointer,glowCurrentPlayerGlowIndex,r,g,b):
+    write(process, (glowPointer + ((glowCurrentPlayerGlowIndex * 0x38) + 0x4)), r, 'float')
+    write(process, (glowPointer + ((glowCurrentPlayerGlowIndex * 0x38) + 0x8)), g, 'float')
+    write(process, (glowPointer + ((glowCurrentPlayerGlowIndex * 0x38) + 0xC)), b, 'float')
+    write(process, (glowPointer + ((glowCurrentPlayerGlowIndex * 0x38) + 0x10)), 1.0, 'float')
+    write(process, (glowPointer + ((glowCurrentPlayerGlowIndex * 0x38) + 0x24)), 1, 'int')
+    write(process, (glowPointer + ((glowCurrentPlayerGlowIndex * 0x38) + 0x25)), 0, 'int')
 
 # glowESP: Enables glow around each entity
 def glowESP(process, client):
-    glowLocalBase = read(process, (client + getOffset(config,'localPlayerOffset')))  # Get the localPlayer
     glowPointer = read(process, (client + getOffset(config,'glowObjectOffset')))  # Get the glow Pointer
-    myTeamID = read(process, (glowLocalBase + getOffset(config,'teamNumOffset')))  # Get the localPlayer team ID
     playerCount = read(process, (client + getOffset(config,'glowObjectOffset') + 0x4))
     for i in range(1, playerCount):  # For each player until the max players available
-        glowCurrentPlayer = read(process, (
-            client + getOffset(config,'entityListOffset') + ((i - 1) * 0x10)))  # Get current entity based on for-loop variable i
-
-        if glowCurrentPlayer == 0x0:  # If the entity is invalid
+        if players[i].dwBase == 0x0:  # If the entity is invalid
             break  # Break out of the for loop, we have reached the current max players
-
-        glowCurrentPlayerDormant = read(process, (
-            glowCurrentPlayer + getOffset(config,'dormantOffset')))  # Get boolean that states whether glowCurrentPlayer entity is dormant or not
-        glowCurrentPlayerGlowIndex = read(process, (
-            glowCurrentPlayer + getOffset(config,'glowIndexOffset')))  # Get the glowIndex of the glowCurrentPlayer entity
-
-        entityBaseTeamID = read(process,
-                                (glowCurrentPlayer + getOffset(config,'teamNumOffset')))  # Get the team ID of the glowCurrentPlayer entity
-
-        if entityBaseTeamID == 0 or glowCurrentPlayerDormant != 0:  # If the glowCurrentPlayer entity is on an irrelevant team (0) or if the glowCurrentPlayer entity is dormant
-            continue  # Continue the for-loop
+        updateEntityData(process, players[i], players[i].dwBase)
+        player = players[i]
+## burdan ekle
+        glowCurrentPlayerGlowIndex = read(process, (player.dwBase + getOffset(config,'glowIndexOffset')))  # Get the glowIndex of the glowCurrentPlayer entity
+        if (me.team == player.team):
+            write(process, (glowPointer + ((glowCurrentPlayerGlowIndex * 0x38) + 0x4)), 0.0, 'float')
+            write(process, (glowPointer + ((glowCurrentPlayerGlowIndex * 0x38) + 0x8)), 0.0, 'float')
+            write(process, (glowPointer + ((glowCurrentPlayerGlowIndex * 0x38) + 0xC)), 1.0, 'float')
+            write(process, (glowPointer + ((glowCurrentPlayerGlowIndex * 0x38) + 0x10)), 1.0, 'float')
+            write(process, (glowPointer + ((glowCurrentPlayerGlowIndex * 0x38) + 0x24)), 1, 'int')
+            write(process, (glowPointer + ((glowCurrentPlayerGlowIndex * 0x38) + 0x25)), 0, 'int')
         else:
-            if myTeamID != entityBaseTeamID:  # If localPlayer team is not glowCurrentPlayer entity team
-                write(process, (glowCurrentPlayer + getOffset(config,'bSpottedOffset')), 1, 'int')  # Set glowCurrentPlayer bspotted to True
-
-            # fucking nigger python with no switch statements kill me
-            if entityBaseTeamID == 2:  # If glowCurrentPlayer entity is a terrorist
-                write(process, (glowPointer + ((glowCurrentPlayerGlowIndex * 0x38) + 0x4)), 1.0, 'float')
-                write(process, (glowPointer + ((glowCurrentPlayerGlowIndex * 0x38) + 0x8)), 0.0, 'float')
-                write(process, (glowPointer + ((glowCurrentPlayerGlowIndex * 0x38) + 0xC)), 0.0, 'float')
-                write(process, (glowPointer + ((glowCurrentPlayerGlowIndex * 0x38) + 0x10)), 1.0, 'float')
-                write(process, (glowPointer + ((glowCurrentPlayerGlowIndex * 0x38) + 0x24)), 1, 'int')
-                write(process, (glowPointer + ((glowCurrentPlayerGlowIndex * 0x38) + 0x25)), 0, 'int')
-            elif entityBaseTeamID == 3:  # else if glowCurrentPlayer entity is a counter-terrorist
-                write(process, (glowPointer + ((glowCurrentPlayerGlowIndex * 0x38) + 0x4)), 0.0, 'float')
-                write(process, (glowPointer + ((glowCurrentPlayerGlowIndex * 0x38) + 0x8)), 0.0, 'float')
-                write(process, (glowPointer + ((glowCurrentPlayerGlowIndex * 0x38) + 0xC)), 1.0, 'float')
-                write(process, (glowPointer + ((glowCurrentPlayerGlowIndex * 0x38) + 0x10)), 1.0, 'float')
-                write(process, (glowPointer + ((glowCurrentPlayerGlowIndex * 0x38) + 0x24)), 1, 'int')
-                write(process, (glowPointer + ((glowCurrentPlayerGlowIndex * 0x38) + 0x25)), 0, 'int')
+            if player.hp > 75:
+                r = 0.0
+                g = 1.0
+                b = 0.0
+            elif player.hp > 50:
+                r = 0.5
+                g = 0.5
+                b = 0.0
+            elif player.hp > 25:
+                r = 1.0
+                g = 0.5
+                b = 0.0
             else:
-                write(process, (glowPointer + ((glowCurrentPlayerGlowIndex * 0x38) + 0x4)), 0.0, 'float')
-                write(process, (glowPointer + ((glowCurrentPlayerGlowIndex * 0x38) + 0x8)), 1.0, 'float')
-                write(process, (glowPointer + ((glowCurrentPlayerGlowIndex * 0x38) + 0xC)), 0.0, 'float')
-                write(process, (glowPointer + ((glowCurrentPlayerGlowIndex * 0x38) + 0x10)), 1.0, 'float')
-                write(process, (glowPointer + ((glowCurrentPlayerGlowIndex * 0x38) + 0x24)), 1, 'int')
-                write(process, (glowPointer + ((glowCurrentPlayerGlowIndex * 0x38) + 0x25)), 0, 'int')
+                r = 1.0
+                g = 0.0
+                b = 0.0
+            drawGlow(process, glowPointer, glowCurrentPlayerGlowIndex, r, g, b)
+
 
 
 # BHOP: Automatically start jumping if in game, on the ground, and space is held
@@ -152,26 +202,24 @@ def soundESP(process, client, localPlayer):
     global csgoWindow
 
     while not end:
-        time.sleep(0.01)
+        time.sleep(0.1)
 
         if win32gui.GetForegroundWindow() == csgoWindow:
             closestPlayer = 99999.0
             playerCount = read(process, (client + getOffset(config,'glowObjectOffset') + 0x4))
             for i in range(0, playerCount):
-                ent = read(process, (
-                    client + getOffset(config,'entityListOffset') + ((i - 1) * 0x10)))  # Get current entity based on for-loop variable i
-
-                if ent is 0x0:
+                ent = players[i]
+                if ent.dwBase is 0x0:
                     break
 
                 entDormant = read(process, (
-                    ent + getOffset(config,'dormantOffset')))  # Get boolean that states whether glowCurrentPlayer entity is dormant or not
+                    ent.dwBase + getOffset(config,'dormantOffset')))  # Get boolean that states whether glowCurrentPlayer entity is dormant or not
 
                 if entDormant != 0:
                     continue
 
                 myTeamID = read(process, (localPlayer + getOffset(config,'teamNumOffset')))  # Get the team ID of the localPlayer
-                entityBaseTeamID = read(process, (ent + getOffset(config,'teamNumOffset')))  # Get the team ID of the ent entity
+                entityBaseTeamID = read(process, (ent.dwBase + getOffset(config,'teamNumOffset')))  # Get the team ID of the ent entity
 
                 if entityBaseTeamID != 2 and entityBaseTeamID != 3:
                     continue
@@ -183,11 +231,11 @@ def soundESP(process, client, localPlayer):
                 localPlayerZ = read(process, (localPlayer + getOffset(config,'vecOriginOffset') + 0x8),
                                     'float')  # Get the Z coordinate of the vecOrigin of the localPlayer
 
-                entityX = read(process, (ent + getOffset(config,'vecOriginOffset')),
+                entityX = read(process, (ent.dwBase + getOffset(config,'vecOriginOffset')),
                                'float')  # Get the X coordinate of the vecOrigin of the ent
-                entityY = read(process, (ent + getOffset(config,'vecOriginOffset') + 0x4),
+                entityY = read(process, (ent.dwBase + getOffset(config,'vecOriginOffset') + 0x4),
                                'float')  # Get the Y coordinate of the vecOrigin of the ent
-                entityZ = read(process, (ent + getOffset(config,'vecOriginOffset') + 0x8),
+                entityZ = read(process, (ent.dwBase + getOffset(config,'vecOriginOffset') + 0x8),
                                'float')  # Get the Z coordinate of the vecOrigin of the ent
 
                 distance = math.sqrt((pow((entityX - localPlayerX), 2) + pow((entityY - localPlayerY), 2) + pow(
@@ -233,7 +281,7 @@ def RCS(process, client, clientState):
             else:
                 oldAimPunchX = 0
                 oldAimPunchY = 0
-        time.sleep(0.01)
+        time.sleep(0.1)
 
 
 def getDLL(name, PID):
@@ -268,6 +316,8 @@ def read(dbg, offset, type="int"):
     if type == "float":
         res = struct.unpack("<f", (pydbg.read(dbg, offset, 4)))
         return res[0]
+
+
 
 def query_yes_no(question, default="yes"):
         """Ask a yes/no question via raw_input() and return their answer.
@@ -323,6 +373,7 @@ def createSettings(config):
     config.set('Offsets','dormantOffset','')
     config.set('Offsets','healthOffset','')
     config.set('Offsets','bSpottedOffset','')
+    config.set('Offsets','flashDurationOffset')
     config.add_section('Options')
     config.set('Options','glowESPEnabled','True')
     config.set('Options','triggerBotEnabled','True')
@@ -358,6 +409,7 @@ def main():
     global glowESPEnabled
     global soundESPEnabled
     global rcsEnabled
+    global noFlashEnabled
     global end
     global csgoWindow
     global bulundu
@@ -377,6 +429,8 @@ def main():
         writeSettings(config,'Options','soundESPEnabled',sound)
         rcs = query_yes_no('Enable RCS?')
         writeSettings(config,'Options','rcsEnabled',rcs)
+        flash = query_yes_no('Enable NoFlash?')
+        writeSettings(config,'Options','noFlashEnabled',flash)
 
     print("waiting for csgo.exe...")
     while True:
@@ -396,6 +450,7 @@ def main():
     glowESPEnabled = getSettings(config,'Options','glowESPEnabled')
     soundESPEnabled = getSettings(config,'Options','soundESPEnabled')
     rcsEnabled = getSettings(config,'Options','rcsEnabled')
+    noFlashEnabled = getSettings(config,'Options','noFlashEnabled')
     print("csgo.exe found. getting modules...")
     client = getDLL("client.dll", processID)  # Get client.dll module
     print("client.dll. : ", client)
@@ -413,6 +468,15 @@ def main():
         print("csgo windows not found.")
         exit(1)
     print("hack started. END to exit.")
+    try:
+        thread.start_new_thread(update,(processHandle, client))
+    except:
+        print("Updater has an error.")
+    if noFlashEnabled:
+        try:
+            thread.start_new_thread(noFlash,(processHandle,client,clientState))
+        except:
+            print("Could not start noflash thread :(")
     if triggerBotEnabled:
         try:
             thread.start_new_thread(triggerBot,
