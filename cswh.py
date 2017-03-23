@@ -26,6 +26,7 @@ proc = None
 config = ConfigParser(allow_no_value=True)
 config.read('settings.ini')
 
+
 class Entity(Structure):
     _fields_ = [
         ("dwBase", c_long),
@@ -35,6 +36,19 @@ class Entity(Structure):
         ("is_alive",c_bool),
         ("weapon_ammo",c_int)
     ]
+
+class Status:
+    def _displayMessage(self, message, level = None):
+        # This can be modified easily
+        if level is not None:
+            print "[%s] %s" % (level, message)
+        else:
+            print "[default] %s" % (message)
+
+    def debug(self, message):
+        self._displayMessage(message, level = "###")
+    def info(self, message):
+        self._displayMessage(message, level = "-->")
 
 global players
 global me
@@ -71,9 +85,12 @@ def updateEntityData(process,e,base):
 
 def noFlash(process,client,clientState):
     global end
+    global noFlashEnabled
     global csgoWindow
     while not end:
         time.sleep(0.1)
+        if not noFlashEnabled:
+            break
         if not win32gui.GetForegroundWindow():
             continue
         if win32gui.GetForegroundWindow() == csgoWindow:
@@ -86,8 +103,12 @@ def noFlash(process,client,clientState):
 def triggerBot(process, client, clientState):
     global end
     global csgoWindow
+    global triggerBotEnabled
+
     while not end:  # This function is threaded so might as well do this :>
         time.sleep(0.1)
+        if not triggerBotEnabled:
+            break
         if not win32gui.GetForegroundWindow():
             continue
         if win32gui.GetForegroundWindow() == csgoWindow:
@@ -184,8 +205,10 @@ def glowESP(process, client):
 def BHOP(process, client, localPlayer, clientState):
     global end
     global csgoWindow
-
+    global autoBHOPEnabled
     while not end:
+        if not autoBHOPEnabled:
+            break
         if win32gui.GetForegroundWindow() == csgoWindow and read(process, (
                     clientState + getOffset(config,'clientStateInGameOffset'))) == 6:  # If client is in game
             flags = read(process, (localPlayer + getOffset(config,'flagsOffset')))  # Get client flags
@@ -199,11 +222,13 @@ def BHOP(process, client, localPlayer, clientState):
 def soundESP(process, client, localPlayer):
     global maxSoundESPDistance
     global end
+    global soundESPEnabled
     global csgoWindow
 
     while not end:
         time.sleep(0.1)
-
+        if not soundESPEnabled:
+            break
         if win32gui.GetForegroundWindow() == csgoWindow:
             closestPlayer = 99999.0
             playerCount = read(process, (client + getOffset(config,'glowObjectOffset') + 0x4))
@@ -399,8 +424,74 @@ def getOffset(config,offset):
     if (result):
         return int(result,16)
     else:
-        print(offset+' not found. Check settings.ini file.')
+        print offset + ' not found. Check settings.ini file.'
         exit(1)
+def AllStatus(st):
+    global triggerBotEnabled
+    global autoBHOPEnabled
+    global glowESPEnabled
+    global soundESPEnabled
+    global rcsEnabled
+    global noFlashEnabled
+
+    while True:
+        if win32api.GetAsyncKeyState(0x74):
+            glowESPEnabled = not glowESPEnabled
+            changeStat(st)
+            time.sleep(1)
+        if win32api.GetAsyncKeyState(0x75):
+            rcsEnabled = not rcsEnabled
+            changeStat(st)
+            time.sleep(1)
+        if win32api.GetAsyncKeyState(0x76):
+            soundESPEnabled = not soundESPEnabled
+            changeStat(st)
+            time.sleep(1)
+        if win32api.GetAsyncKeyState(0x77):
+            triggerBotEnabled = not triggerBotEnabled
+            changeStat(st)
+            time.sleep(1)
+        if win32api.GetAsyncKeyState(0x78):
+            autoBHOPEnabled = not autoBHOPEnabled
+            changeStat(st)
+            time.sleep(1)
+        if win32api.GetAsyncKeyState(0x79):
+            noFlashEnabled = not noFlashEnabled
+            changeStat(st)
+            time.sleep(1)
+
+def changeStat(st):
+    global triggerBotEnabled
+    global autoBHOPEnabled
+    global glowESPEnabled
+    global soundESPEnabled
+    global rcsEnabled
+    global noFlashEnabled
+
+    if glowESPEnabled == True:
+        st.info('Glow ESP : ' + "ON" + " (F5)")
+    else:
+        st.info('Glow ESP : ' + "OFF" + " (F5)")
+    if rcsEnabled == True:
+        st.info('RCS : '+ 'ON' + ' (F6)')
+    else:
+        st.info('RCS : ' + 'OFF' + ' (F6)')
+    if soundESPEnabled == True:
+        st.info('Sound ESP : '+ 'ON' + ' (F7)')
+    else:
+        st.info('Sound ESP : ' + 'OFF' + ' (F7)')
+    if triggerBotEnabled == True:
+        st.info('Trigger Bot : ' + 'ON' + ' (F8)')
+    else:
+        st.info('Trigger Bot : ' + 'OFF' + ' (F8)')
+    if autoBHOPEnabled == True:
+        st.info('BunnyHop : ' + 'ON' + ' (F9)')
+    else:
+        st.info('BunnyHop : ' + 'OFF' + ' (F9)')
+    if noFlashEnabled == True:
+        st.info('No Flash : ' + 'ON' + ' (F10)')
+    else:
+        st.info('No Flash : ' + 'OFF' + ' (F10)')
 
 # main: Main function, starts all the threads, does glow esp, waits for end key, etc :)
 def main():
@@ -432,7 +523,8 @@ def main():
         flash = query_yes_no('Enable NoFlash?')
         writeSettings(config,'Options','noFlashEnabled',flash)
 
-    print("waiting for csgo.exe...")
+    st = Status()
+    st.debug("waiting for csgo.exe...")
     while True:
         c = wmi.WMI()
         for pr in c.Win32_Process():
@@ -445,72 +537,95 @@ def main():
                 break
         if bulundu == True:
             break
-    triggerBotEnabled = getSettings(config,'Options','triggerBotEnabled')
-    autoBHOPEnabled = getSettings(config,'Options','autoBHOPEnabled')
-    glowESPEnabled = getSettings(config,'Options','glowESPEnabled')
-    soundESPEnabled = getSettings(config,'Options','soundESPEnabled')
-    rcsEnabled = getSettings(config,'Options','rcsEnabled')
-    noFlashEnabled = getSettings(config,'Options','noFlashEnabled')
-    print("csgo.exe found. getting modules...")
+    if getSettings(config,'Options','triggerBotEnabled') == 'True':
+        triggerBotEnabled = True
+    else:
+        triggerBotEnabled = False
+    if getSettings(config,'Options','autoBHOPEnabled') == 'True':
+        autoBHOPEnabled = True
+    else:
+        autoBHOPEnabled = False
+    if getSettings(config,'Options','glowESPEnabled') == 'True':
+        glowESPEnabled = True
+    else:
+        glowESPEnabled = False
+    if getSettings(config,'Options','soundESPEnabled') == 'True':
+        soundESPEnabled = True
+    else:
+        soundESPEnabled = False
+    if getSettings(config,'Options','rcsEnabled') == 'True':
+        rcsEnabled = True
+    else:
+        rcsEnabled = False
+    if getSettings(config,'Options','noFlashEnabled') == 'True':
+        noFlashEnabled = True
+    else:
+        noFlashEnabled = False
+    st.debug("csgo.exe found. getting modules...")
     client = getDLL("client.dll", processID)  # Get client.dll module
-    print("client.dll. : ", client)
+    st.debug("client.dll. : "+ str(client))
     engine = getDLL("engine.dll", processID)  # Get engine.dll module
-    print("engine.dll. : ", engine)
+    st.debug("engine.dll. : "+ str(engine))
     clientState = read(processHandle, (engine + getOffset(config,'clientStateOffset')))  # Get clientState pointer
-    print("ClientState : ",clientState)
-    print("waiting for LocalPlayer...")
+    st.debug("ClientState : "+ str(clientState))
+    st.debug("waiting for LocalPlayer...")
     localPlayer = 0
     while localPlayer == 0:
         localPlayer = read(processHandle, (client + getOffset(config,'localPlayerOffset')))  # Get localPlayer pointer
-    print("LocalPlayer: ", localPlayer)
+    st.debug("LocalPlayer: "+ str(localPlayer))
     csgoWindow = win32gui.FindWindow(None, "Counter-Strike: Global Offensive")
     if csgoWindow is None:
-        print("csgo windows not found.")
+        st.debug("csgo windows not found.")
         exit(1)
-    print("hack started. END to exit.")
+    st.debug("hack started. END to exit.")
     try:
         thread.start_new_thread(update,(processHandle, client))
     except:
-        print("Updater has an error.")
+        st.debug("Updater has an error.")
     if noFlashEnabled:
         try:
-            thread.start_new_thread(noFlash,(processHandle,client,clientState))
+            thread.start_new_thread(noFlash,(processHandle,client,clientState,))
         except:
-            print("Could not start noflash thread :(")
+            st.debug("Could not start noflash thread :(")
     if triggerBotEnabled:
         try:
             thread.start_new_thread(triggerBot,
                                     (processHandle, client, clientState,))  # Start triggerBot function threaded
         except:
-            print("Could not start triggerbot thread :(")
+            st.debug("Could not start triggerbot thread :(")
 
     if autoBHOPEnabled:
         try:
             thread.start_new_thread(BHOP,
                                     (processHandle, client, localPlayer, clientState,))  # Start BHOP function threaded
         except:
-            print("Could not start bhop thread :(")
+            st.debug("Could not start bhop thread :(")
 
     if soundESPEnabled:
         try:
             thread.start_new_thread(soundESP, (processHandle, client, localPlayer,))  # Start soundESP function threaded
         except:
-            print("Could not start playerCounter thread :(")
+            st.debug("Could not start playerCounter thread :(")
 
     if rcsEnabled:
         try:
             thread.start_new_thread(RCS, (processHandle, client, clientState,))  # Start RCS function threaded
         except:
-            print("Could not start rcs thread :(")
+            st.debug("Could not start rcs thread :(")
+    try:
+        thread.start_new_thread(AllStatus,(st,))
+    except:
+        st.debug("status not working..")
+    changeStat(st)
 
     while not win32api.GetAsyncKeyState(0x23):  # While END key isn't touched
-        if read(processHandle, (clientState + getOffset(config,'clientStateInGameOffset'))) == 6:  # If client is in game
+        if read(processHandle,
+                (clientState + getOffset(config, 'clientStateInGameOffset'))) == 6:  # If client is in game
             if glowESPEnabled and win32gui.GetForegroundWindow() == csgoWindow:
                 glowESP(processHandle, client)  # Call glowESP function non-threaded
             time.sleep(0.01)
     end = True  # Tells the threads to stop looping, prevents future problems
     time.sleep(0.01)
-
 
 if __name__ == "__main__":
     if not admin.isUserAdmin():
