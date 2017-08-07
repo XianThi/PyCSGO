@@ -11,6 +11,8 @@ import winsound
 import wmi
 import admin
 import os.path
+import urllib
+import json
 
 maxSoundESPDistance = 780  # Default: 780, decent distance tbh
 RCSPerfectPercent = 100  # Percent of RCS being perfect, 100% = perfect RCS
@@ -60,7 +62,8 @@ me = players[129]
 def update(process,client):
     playerBase = read(process,(client+getOffset(config,'localPlayerOffset')))
     updateEntityData(process,me,playerBase)
-    playerCount = read(process, (client + getOffset(config, 'glowObjectOffset') + 0x4))
+    #playerCount = read(process, (client + getOffset(config, 'glowObjectOffset') + 0x4))
+    playerCount = 64
     for cp in range(playerCount):
         entBase = read(process,(client+getOffset(config,'entityListOffset')+cp*0x10))
         if (entBase == 0x0):
@@ -165,21 +168,22 @@ def drawGlow(process,glowPointer,glowCurrentPlayerGlowIndex,r,g,b):
 # glowESP: Enables glow around each entity
 def glowESP(process, client):
     glowPointer = read(process, (client + getOffset(config,'glowObjectOffset')))  # Get the glow Pointer
-    playerCount = read(process, (client + getOffset(config,'glowObjectOffset') + 0x4))
+    #playerCount = read(process, (client + getOffset(config,'glowObjectOffset') + 0x4))
+    playerCount = 64
     for i in range(1, playerCount):  # For each player until the max players available
-        if players[i].dwBase == 0x0:  # If the entity is invalid
+        glowCurrentPlayer = read(process,(client+getOffset(config,'entityListOffset')+((i-1)*16)))
+        if glowCurrentPlayer == 0x0:
             break  # Break out of the for loop, we have reached the current max players
-        updateEntityData(process, players[i], players[i].dwBase)
+        updateEntityData(process, players[i], glowCurrentPlayer)
         player = players[i]
 ## burdan ekle
         glowCurrentPlayerGlowIndex = read(process, (player.dwBase + getOffset(config,'glowIndexOffset')))  # Get the glowIndex of the glowCurrentPlayer entity
+        if player.team == 0 or player.is_dormant == True:
+			continue
         if (me.team == player.team):
-            write(process, (glowPointer + ((glowCurrentPlayerGlowIndex * 0x38) + 0x4)), 0.0, 'float')
-            write(process, (glowPointer + ((glowCurrentPlayerGlowIndex * 0x38) + 0x8)), 0.0, 'float')
-            write(process, (glowPointer + ((glowCurrentPlayerGlowIndex * 0x38) + 0xC)), 1.0, 'float')
-            write(process, (glowPointer + ((glowCurrentPlayerGlowIndex * 0x38) + 0x10)), 1.0, 'float')
-            write(process, (glowPointer + ((glowCurrentPlayerGlowIndex * 0x38) + 0x24)), 1, 'int')
-            write(process, (glowPointer + ((glowCurrentPlayerGlowIndex * 0x38) + 0x25)), 0, 'int')
+            r = 0.0
+            g = 0.0
+            b = 1.0
         else:
             if player.hp > 75:
                 r = 0.0
@@ -197,7 +201,7 @@ def glowESP(process, client):
                 r = 1.0
                 g = 0.0
                 b = 0.0
-            drawGlow(process, glowPointer, glowCurrentPlayerGlowIndex, r, g, b)
+        drawGlow(process, glowPointer, glowCurrentPlayerGlowIndex, r, g, b)
 
 
 
@@ -231,7 +235,8 @@ def soundESP(process, client, localPlayer):
             break
         if win32gui.GetForegroundWindow() == csgoWindow:
             closestPlayer = 99999.0
-            playerCount = read(process, (client + getOffset(config,'glowObjectOffset') + 0x4))
+            #playerCount = read(process, (client + getOffset(config,'glowObjectOffset') + 0xC))
+            playerCount = 64
             for i in range(0, playerCount):
                 ent = players[i]
                 if ent.dwBase is 0x0:
@@ -395,7 +400,7 @@ def createSettings(config):
     config.set('Offsets','glowObjectOffset','')
     config.set('Offsets','glowIndexOffset','')
     config.set('Offsets','teamNumOffset','')
-    config.set('Offsets','dormantOffset','')
+    config.set('Offsets','dormantOffset','0xE9')
     config.set('Offsets','healthOffset','')
     config.set('Offsets','bSpottedOffset','')
     config.set('Offsets','flashDurationOffset')
@@ -460,14 +465,39 @@ def AllStatus(st):
             changeStat(st)
             time.sleep(1)
 
+def updateConfigfromGithub(config):
+    url = "https://raw.githubusercontent.com/frk1/hazedumper/master/csgo.json"
+    response = urllib.urlopen(url)
+    data = json.loads(response.read())
+    writeSettings(config, 'Offsets', 'entitylistoffset', hex(data['signatures']['dwEntityList']))
+    writeSettings(config, 'Offsets', 'localplayerindexoffset', hex(data['signatures']['dwClientState_GetLocalPlayer']))
+    writeSettings(config, 'Offsets', 'localplayeroffset', hex(data['signatures']['dwLocalPlayer']))
+    writeSettings(config, 'Offsets', 'glowobjectoffset', hex(data['signatures']['dwGlowObjectManager']))
+    writeSettings(config, 'Offsets', 'forceattackoffset', hex(data['signatures']['dwForceAttack']))
+    writeSettings(config, 'Offsets', 'forcejumpoffset', hex(data['signatures']['dwForceJump']))
+    writeSettings(config, 'Offsets', 'clientstateoffset', hex(data['signatures']['dwClientState']))
+    writeSettings(config, 'Offsets', 'clientstateviewanglesoffset', hex(data['signatures']['dwClientState_ViewAngles']))
+    writeSettings(config, 'Offsets', 'clientstateingameoffset', hex(data['signatures']['dwClientState_State']))
+    writeSettings(config, 'Offsets', 'crossHairIDOffset', hex(data['netvars']['m_iCrosshairId']))
+    writeSettings(config, 'Offsets', 'aimpunchoffset', hex(data['netvars']['m_aimPunchAngle']))
+    writeSettings(config, 'Offsets', 'flagsoffset', hex(data['netvars']['m_fFlags']))
+    writeSettings(config, 'Offsets', 'vecoriginoffset', hex(data['netvars']['m_vecOrigin']))
+    writeSettings(config, 'Offsets', 'shotsfiredoffset', hex(data['netvars']['m_iShotsFired']))
+    writeSettings(config, 'Offsets', 'bonematrix', hex(data['netvars']['m_dwBoneMatrix']))
+    writeSettings(config, 'Offsets', 'glowindexoffset', hex(data['netvars']['m_iGlowIndex']))
+    writeSettings(config, 'Offsets', 'teamnumoffset', hex(data['netvars']['m_iTeamNum']))
+    writeSettings(config, 'Offsets', 'healthoffset', hex(data['netvars']['m_iHealth']))
+    writeSettings(config, 'Offsets', 'bspottedoffset', hex(data['netvars']['m_bSpotted']))
+    writeSettings(config, 'Offsets', 'flashdurationoffset', hex(data['netvars']['m_flFlashDuration']))
+
 def changeStat(st):
     global triggerBotEnabled
     global autoBHOPEnabled
     global glowESPEnabled
     global soundESPEnabled
     global rcsEnabled
-    global noFlashEnabled
-
+    clear = "\n" * 100
+    print clear
     if glowESPEnabled == True:
         st.info('Glow ESP : ' + "ON" + " (F5)")
     else:
@@ -524,6 +554,9 @@ def main():
         writeSettings(config,'Options','noFlashEnabled',flash)
 
     st = Status()
+    st.debug("Updating offsets...")
+    updateConfigfromGithub(config)
+    st.debug("Offsets updated...")
     st.debug("waiting for csgo.exe...")
     while True:
         c = wmi.WMI()
@@ -605,7 +638,7 @@ def main():
         try:
             thread.start_new_thread(soundESP, (processHandle, client, localPlayer,))  # Start soundESP function threaded
         except:
-            st.debug("Could not start playerCounter thread :(")
+            st.debug("Could not start soundESP thread :(")
 
     if rcsEnabled:
         try:
