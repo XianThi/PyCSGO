@@ -4,7 +4,7 @@ import Offsets
 
 
 class Game:
-    def __init__(self, mem, offsets:Offsets.OffsetsConfig):
+    def __init__(self, mem, offsets: Offsets.OffsetsConfig):
         self.mem = mem
         self.offsets = offsets
 
@@ -20,6 +20,7 @@ class Game:
         if not self.update_matrix():
             print("Failed to update view matrix")
             return False
+
         return True
 
     # =========================
@@ -45,9 +46,7 @@ class Game:
                 self.mem.client + self.offsets.entityList
             )
 
-            self.list_entry = self.mem.read_ulonglong(
-                self.entity_list + 0x10
-            )
+            self.list_entry = self.mem.read_ulonglong(self.entity_list + 0x10)
 
             return True
         except:

@@ -30,9 +30,14 @@ class Bomb:
 
         try:
             # planted check
-            self.is_planted = self.mem.read_int(
-                self.mem.client + self.offsets.plantedC4 - self.offsets.bomb.m_isPlanted
-            ) != 0
+            self.is_planted = (
+                self.mem.read_int(
+                    self.mem.client
+                    + self.offsets.plantedC4
+                    - self.offsets.bomb.m_isPlanted
+                )
+                != 0
+            )
 
             if not self.is_planted:
                 Bomb.prev_is_planted = False
@@ -49,9 +54,7 @@ class Bomb:
                 return False
 
             # site
-            site = self.mem.read_int(
-                self.address + self.offsets.bomb.m_nBombSite
-            )
+            site = self.mem.read_int(self.address + self.offsets.bomb.m_nBombSite)
 
             self.site = BombSite.B if site == 1 else BombSite.A
 
@@ -61,9 +64,7 @@ class Bomb:
             )
 
             if node:
-                self.pos = self.mem.read_vec3(
-                    node + self.offsets.bomb.m_vecAbsOrigin
-                )
+                self.pos = self.mem.read_vec3(node + self.offsets.bomb.m_vecAbsOrigin)
 
             # plant time logic
             if not Bomb.prev_is_planted:

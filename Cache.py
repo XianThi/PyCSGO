@@ -8,16 +8,25 @@ from Globals import Globals
 from Offsets import GameOptions
 from Player import Player
 
+
 class Snapshot:
-    def __init__(self, game:Game, bomb:Bomb, globals_:Globals, players:list[Player], options: GameOptions = None):
+    def __init__(
+        self,
+        game: Game,
+        bomb: Bomb,
+        globals_: Globals,
+        players: list[Player],
+        options: GameOptions = None,
+    ):
         self.game = game
         self.bomb = bomb
         self.globals = globals_
         self.players = players
         self.options = options
-        
+
+
 class Cache:
-    def __init__(self, mem, offsets,options: GameOptions):
+    def __init__(self, mem, offsets, options: GameOptions):
         self.mem = mem
         self.offsets = offsets
         self.options = options
@@ -36,6 +45,7 @@ class Cache:
         self.auto_bhop_enabled = self.options.autoBHOPEnabled
         self.sound_esp_enabled = self.options.soundESPEnabled
         self.rcs_enabled = self.options.rcsEnabled
+
     # =========================
 
     def refresh(self):
@@ -97,12 +107,8 @@ class Cache:
         # toggle rcs
         if key == 0x56:  # V
             self.rcs_enabled = not self.rcs_enabled
-    
+
     def snapshot(self):
         return Snapshot(
-            self.game,
-            self.bomb,
-            self.globals,
-            self.players.copy(),
-            self.options
+            self.game, self.bomb, self.globals, self.players.copy(), self.options
         )

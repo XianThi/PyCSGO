@@ -3,14 +3,16 @@ import struct
 import Offsets
 
 
-
 class BoneData:
     def __init__(self, pos):
         self.pos = pos
 
+
 class BonePos:
     def __init__(self, pos):
         self.pos = pos
+
+
 class BoneIndex:
     head = 6
     neck_0 = 5
@@ -33,6 +35,7 @@ class BoneIndex:
     leg_upper_R = 25
     leg_lower_R = 26
     ankle_R = 27
+
 
 class Player:
     def __init__(self, index, list_entry, mem, offsets: Offsets.OffsetsConfig):
@@ -91,9 +94,7 @@ class Player:
 
     def get_controller(self):
         try:
-            self.controller = self.mem.read_ulonglong(
-                self.le + (self.index + 1) * 0x70
-            )
+            self.controller = self.mem.read_ulonglong(self.le + (self.index + 1) * 0x70)
             return self.controller != 0
         except:
             return False
@@ -143,8 +144,7 @@ class Player:
             self.bot = self.steam_id == 0
 
             self.name = self.mem.read_string(
-                self.controller + self.offsets.controller.m_iszPlayerName,
-                32
+                self.controller + self.offsets.controller.m_iszPlayerName, 32
             )
 
             self.localplayer = self.mem.read_bool(
@@ -173,42 +173,35 @@ class Player:
 
     def update_pawn(self):
         try:
-            self.health = self.mem.read_int(
-                self.pawn + self.offsets.pawn.m_iHealth
-            )
+            self.health = self.mem.read_int(self.pawn + self.offsets.pawn.m_iHealth)
 
             self.alive = self.health > 0
 
             if not self.alive:
                 return True
 
-            self.pos = self.mem.read_vec3(
-                self.pawn + self.offsets.pawn.m_vOldOrigin
-            )
+            self.pos = self.mem.read_vec3(self.pawn + self.offsets.pawn.m_vOldOrigin)
 
-            self.team = self.mem.read_int(
-                self.pawn + self.offsets.pawn.m_iTeamNum
-            )
+            self.team = self.mem.read_int(self.pawn + self.offsets.pawn.m_iTeamNum)
 
-            self.armor = self.mem.read_int(
-                self.pawn + self.offsets.pawn.m_ArmorValue
-            )
+            self.armor = self.mem.read_int(self.pawn + self.offsets.pawn.m_ArmorValue)
 
             self.defusing = self.mem.read_bool(
                 self.pawn + self.offsets.pawn.m_bIsDefusing
             )
 
             self.spotted = self.mem.read_bool(
-                self.pawn + self.offsets.pawn.m_entitySpottedState + self.offsets.pawn.m_bSpottedByMask
+                self.pawn
+                + self.offsets.pawn.m_entitySpottedState
+                + self.offsets.pawn.m_bSpottedByMask
             )
 
-            self.flashed = self.mem.read_float(
-                self.pawn + self.offsets.pawn.m_flFlashOverlayAlpha
-            ) > 0
-
-            self.scoped = self.mem.read_bool(
-                self.pawn + self.offsets.pawn.m_bIsScoped
+            self.flashed = (
+                self.mem.read_float(self.pawn + self.offsets.pawn.m_flFlashOverlayAlpha)
+                > 0
             )
+
+            self.scoped = self.mem.read_bool(self.pawn + self.offsets.pawn.m_bIsScoped)
 
             self.update_skeleton()
             self.update_weapon()
@@ -242,9 +235,9 @@ class Player:
             raw = self.mem.pm.read_bytes(bone_array, 30 * 0x20)
 
             for i in range(30):
-                x = struct.unpack("<f", raw[i*0x20:i*0x20+4])[0]
-                y = struct.unpack("<f", raw[i*0x20+4:i*0x20+8])[0]
-                z = struct.unpack("<f", raw[i*0x20+8:i*0x20+12])[0]
+                x = struct.unpack("<f", raw[i * 0x20 : i * 0x20 + 4])[0]
+                y = struct.unpack("<f", raw[i * 0x20 + 4 : i * 0x20 + 8])[0]
+                z = struct.unpack("<f", raw[i * 0x20 + 8 : i * 0x20 + 12])[0]
 
                 self.bone_list.append((x, y, z))
 
@@ -275,6 +268,7 @@ class Player:
 
         except:
             return False
+
     def get_bounds(self, view_matrix, screen_size, w2s_func):
         origin = w2s_func(self.pos, view_matrix, screen_size)
 

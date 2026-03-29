@@ -21,12 +21,13 @@ CONNECTIONS = [
     (25, 26),
     (26, 27),
 ]
+
+
 class Esp:
     def __init__(self):
         self.font = pygame.font.SysFont("consolas", 14)
-        self.mode = "full" # full, skeleton, head, box
 
-    def render(self, screen, snap:Snapshot):
+    def render(self, screen, snap: Snapshot):
         if not snap.options.glowESPEnabled:
             return
 
@@ -46,24 +47,24 @@ class Esp:
         for p in players:
             if not p.alive or p.localplayer:
                 continue
-            if localplayer is None or localplayer.pos is None or p is None or p.pos is None:
+            if (
+                localplayer is None
+                or localplayer.pos is None
+                or p is None
+                or p.pos is None
+            ):
                 continue
             dist = distance(localplayer.pos, p.pos)
-            if dist < 500:
-                self.mode = "full"
-            elif dist < 1000:
-                self.mode = "normal"
-            else:
-                self.mode = "minimal"
-            mate = (p.team == local_team)
+            mate = p.team == local_team
             if mate:
                 continue
             self.render_with_mode(screen, vm, p, mate, dist)
-            #self.render_player(screen, p, vm, mate)
+            # self.render_player(screen, p, vm, mate)
 
         # extra
         if snap.bomb:
             self.render_bomb(screen, snap.bomb, vm, localplayer)
+
     def get_head_radius(self, width, dist):
         base = int(width / 6)
 
@@ -73,45 +74,47 @@ class Esp:
             return max(3, base)
         else:
             return base
-    def get_thickness(self,dist):
+
+    def get_thickness(self, dist):
         if dist < 400:
             return 2
         elif dist < 1000:
             return 2
         else:
             return 3  # uzak = daha kalın
-    def render_with_mode(self, screen, vm, p, mate,dist=0):
-        if self.mode == "full":
-            self.render_player(screen, p, vm, mate,dist)
-        elif self.mode == "normal":
-            self.render_skeleton(screen, p, vm, mate,dist)
-        elif self.mode == "minimal":
+
+    def render_with_mode(self, screen, vm, p, mate, dist=0):
+        if dist < 500:
+            self.render_player(screen, p, vm, mate, dist)
+        elif dist < 1000:
+            self.render_skeleton(screen, p, vm, mate, dist)
+        else:
             bounds = p.get_bounds(vm, (WIDTH, HEIGHT), world_to_screen)
             if not bounds:
                 return
             (x1, y1), (x2, y2) = bounds
-            self.render_head(screen, p, bounds, vm, mate,dist)
+            self.render_head(screen, p, bounds, vm, mate, dist)
 
-    def render_player(self, screen, p:Player, vm, mate,dist=0):
+    def render_player(self, screen, p: Player, vm, mate, dist=0):
         bounds = p.get_bounds(vm, (WIDTH, HEIGHT), world_to_screen)
         if not bounds:
             return
 
         (x1, y1), (x2, y2) = bounds
 
-        thickness =self.get_thickness(dist)
+        thickness = self.get_thickness(dist)
         # BOX
-        if True: 
+        if True:
             pass
-            color = (0,0,255) if mate else (255,0,0)
-            pygame.draw.rect(screen, color, (x1, y1, x2-x1, y2-y1), thickness)
+            color = (0, 0, 255) if mate else (255, 0, 0)
+            pygame.draw.rect(screen, color, (x1, y1, x2 - x1, y2 - y1), thickness)
 
         # SKELETON
         if True:
-            self.render_skeleton(screen, p, vm, mate,dist)
+            self.render_skeleton(screen, p, vm, mate, dist)
 
         # HEAD TRACKER
-        self.render_head(screen, p, bounds, vm, mate,dist)
+        self.render_head(screen, p, bounds, vm, mate, dist)
 
         # HP BAR
         self.render_health(screen, p, bounds)
@@ -119,8 +122,8 @@ class Esp:
         # NAME
         self.render_name(screen, p, bounds)
 
-    def render_skeleton(self, screen, p, vm, mate,dist=0):
-        color = (0,255,255) if mate else (255,255,0)
+    def render_skeleton(self, screen, p, vm, mate, dist=0):
+        color = (0, 255, 255) if mate else (255, 255, 0)
 
         for b1, b2 in CONNECTIONS:
 
@@ -130,19 +133,19 @@ class Esp:
             bone1 = p.bone_list[b1]
             bone2 = p.bone_list[b2]
 
-            s1 = world_to_screen(bone1,vm, (WIDTH, HEIGHT))
-            s2 = world_to_screen(bone2,vm, (WIDTH, HEIGHT))
+            s1 = world_to_screen(bone1, vm, (WIDTH, HEIGHT))
+            s2 = world_to_screen(bone2, vm, (WIDTH, HEIGHT))
 
             if not s1 or not s2:
                 continue
-            thickness =self.get_thickness(dist)
+            thickness = self.get_thickness(dist)
             pygame.draw.line(screen, color, s1, s2, thickness)
-    
-    def render_head(self, screen, p, bounds, vm, mate,dist=0):
+
+    def render_head(self, screen, p, bounds, vm, mate, dist=0):
         if not p.bone_list:
             return
 
-        head = p.bone_list[6] # BONE_INDEX.head = 6
+        head = p.bone_list[6]  # BONE_INDEX.head = 6
         screen_pos = world_to_screen(head, vm, (WIDTH, HEIGHT))
 
         if not screen_pos:
@@ -150,53 +153,48 @@ class Esp:
 
         (x1, y1), (x2, y2) = bounds
         width = x2 - x1
-        color = (0,255,0) if mate else (255,0,0)
+        color = (0, 255, 0) if mate else (255, 0, 0)
         radius = self.get_head_radius(width, dist)
-        thickness =self.get_thickness(dist)
-        pygame.draw.circle(screen, color, screen_pos, radius, thickness)
-    
+        thickness = self.get_thickness(dist)
+        pygame.draw.circle(
+            screen, (0, 0, 0), screen_pos, radius + 1, thickness + 1
+        )  # outline
+        pygame.draw.circle(screen, color, screen_pos, radius, thickness)  # inline
+
     def render_health(self, screen, p, bounds):
         (x1, y1), (x2, y2) = bounds
-
         height = y2 - y1
         hp = max(0, min(100, p.health))
-
         filled = height * (hp / 100)
+        pygame.draw.rect(screen, (0, 255, 0), (x1 - 6, y2 - filled, 3, filled))  # bar
+        pygame.draw.rect(screen, (0, 0, 0), (x1 - 6, y1, 3, height), 1)  # outline
 
-        # bar
-        pygame.draw.rect(screen, (0,255,0),
-            (x1-6, y2-filled, 3, filled))
-
-        # outline
-        pygame.draw.rect(screen, (0,0,0),
-            (x1-6, y1, 3, height), 1)
-        
     def render_name(self, screen, p, bounds):
         (x1, y1), (x2, y2) = bounds
 
         text = p.name
-        surf = self.font.render(text, True, (255,255,255))
+        surf = self.font.render(text, True, (255, 255, 255))
 
         screen.blit(surf, (x1, y1 - 15))
-    
+
     def render_tracer(self, screen, p, vm, mate):
         screen_pos = world_to_screen(p.pos, vm, (WIDTH, HEIGHT))
 
         if not screen_pos:
             return
 
-        center = (WIDTH//2, HEIGHT//2)
+        center = (WIDTH // 2, HEIGHT // 2)
 
-        color = (0,255,255) if mate else (255,255,0)
+        color = (0, 255, 255) if mate else (255, 255, 0)
 
         pygame.draw.line(screen, color, center, screen_pos, 1)
 
     def render_bomb(self, screen, bomb, vm, localplayer):
-        pos = world_to_screen(bomb.pos,vm, (WIDTH, HEIGHT))
+        pos = world_to_screen(bomb.pos, vm, (WIDTH, HEIGHT))
         if not pos:
             return
 
         text = f"{bomb.site} - {int(bomb.time_left)}s"
 
-        surf = self.font.render(text, True, (255,255,255))
+        surf = self.font.render(text, True, (255, 255, 255))
         screen.blit(surf, (pos[0], pos[1]))

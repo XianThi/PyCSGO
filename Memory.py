@@ -9,21 +9,22 @@ class Memory:
         self.pid = None
         self.client = 0
         self.engine = 0
-    
+
     def get_module_base_pymem(self, name):
         try:
             module = pymem.process.module_from_name(self.pm.process_handle, name)
             return module.lpBaseOfDll
         except:
             return 0
-    
+
     def attach(self, process_name="cs2.exe"):
-        for proc in psutil.process_iter(['pid', 'name']):
-            if proc.info['name'] == process_name:
-                self.pid = proc.info['pid']
+        for proc in psutil.process_iter(["pid", "name"]):
+            if proc.info["name"] == process_name:
+                self.pid = proc.info["pid"]
                 self.pm = pymem.Pymem(self.pid)
                 return True
         return False
+
     # =========================
     # MODULES
 
@@ -45,14 +46,16 @@ class Memory:
         return (
             self.read_float(addr),
             self.read_float(addr + 4),
-            self.read_float(addr + 8)
+            self.read_float(addr + 8),
         )
+
     def read_bool(self, addr):
         return struct.unpack("<?", self.pm.read_bytes(addr, 1))[0]
+
     def read_string(self, addr, size=32):
         raw = self.pm.read_bytes(addr, size)
         return raw.split(b"\x00", 1)[0].decode(errors="ignore")
-    
+
     # =========================
     # WRITE
 

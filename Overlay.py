@@ -10,18 +10,19 @@ import win32api
 import time
 import sys
 
+
 class AntiDetectionOverlay:
-    def __init__(self,cache:Cache,WIDTH=1920, HEIGHT=1080):
+    def __init__(self, cache: Cache, WIDTH=1920, HEIGHT=1080):
         self.cache = cache
         self.WIDTH = WIDTH
         self.HEIGHT = HEIGHT
         pygame.init()
         self.screen = pygame.display.set_mode(
-            (self.WIDTH, self.HEIGHT), 
-            pygame.NOFRAME | pygame.HWSURFACE | pygame.DOUBLEBUF | pygame.SCALED
+            (self.WIDTH, self.HEIGHT),
+            pygame.NOFRAME | pygame.HWSURFACE | pygame.DOUBLEBUF | pygame.SCALED,
         )
         pygame.display.set_caption("Spotify.exe - Premium")  # Signature spoof
-        
+
         # Icon spoof (opsiyonel)
         try:
             icon = pygame.image.load("icon.png")
@@ -43,6 +44,7 @@ class AntiDetectionOverlay:
             return random.choice(["Netflix", "YouTube", "Discord"])
         else:  # Gece
             return random.choice(["Task Manager", "cmd.exe", "PowerShell"])
+
     def apply_bypass(self):
         """Tüm bypass teknikleri"""
         # Click-through + Layered
@@ -53,58 +55,58 @@ class AntiDetectionOverlay:
             ex_style
             | win32con.WS_EX_LAYERED
             | win32con.WS_EX_TOPMOST
-            | win32con.WS_EX_TRANSPARENT   # 🔥 input geçirme
+            | win32con.WS_EX_TRANSPARENT,  # 🔥 input geçirme
         )
         win32gui.SetLayeredWindowAttributes(
-            self.hwnd,
-            0x000000,  # siyah transparan
-            255,
-            win32con.LWA_COLORKEY
+            self.hwnd, 0x000000, 255, win32con.LWA_COLORKEY  # siyah transparan
         )
         win32gui.SetWindowPos(
             self.hwnd,
             win32con.HWND_TOPMOST,
-            0, 0, 0, 0,
-            win32con.SWP_NOMOVE | win32con.SWP_NOSIZE
+            0,
+            0,
+            0,
+            0,
+            win32con.SWP_NOMOVE | win32con.SWP_NOSIZE,
         )
         # Opacity 100% ama input transparent
-        #win32gui.SetLayeredWindowAttributes(self.hwnd, 0, 255, win32con.LWA_ALPHA)
-        
+        # win32gui.SetLayeredWindowAttributes(self.hwnd, 0, 255, win32con.LWA_ALPHA)
+
         # Title spoof
         win32gui.SetWindowText(self.hwnd, self.get_smart_title())
         # Process name spoof (advanced)
-        #self.spoof_process_name()
-    
+        # self.spoof_process_name()
+
     # def spoof_process_name(self):
     #     """Process signature değiştir (ileri seviye)"""
     #     # PsSetCreateProcessNotifyRoutine ile hook (C++ gerekir)
     #     # Python'da basit alternatif: thread name değiştir
     #     ctypes.windll.kernel32.SetThreadDescription(
-    #         ctypes.windll.kernel32.GetCurrentThread(), 
+    #         ctypes.windll.kernel32.GetCurrentThread(),
     #         b"SpotifyWorkerThread"
     #     )
-    
+
     # def update_game_position(self):
     #     """Game window ile sync kal"""
     #     game_hwnd = win32gui.FindWindow(None, "Counter-Strike 2")
     #     if game_hwnd:
     #         rect = win32gui.GetWindowRect(game_hwnd)
     #         win32gui.SetWindowPos(self.hwnd, win32con.HWND_TOPMOST,
-    #                              rect[0], rect[1], 
+    #                              rect[0], rect[1],
     #                              rect[2]-rect[0], rect[3]-rect[1], 0)
-    
+
     def run(self):
         clock = pygame.time.Clock()
         running = True
-        
+
         while running:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
-            
+
             # Game position sync
             # self.update_game_position()
-            
+
             # Render (ESP örneği)
             self.screen.fill((0, 0, 0))
             snap = self.cache.snapshot()
@@ -121,10 +123,10 @@ class AntiDetectionOverlay:
                 self.esp.render(self.screen, snap)
             pygame.display.flip()
             clock.tick(120)
-        
+
         pygame.quit()
         sys.exit()
-    
+
     def is_pressed(self, vk):
         state = win32api.GetAsyncKeyState(vk)
         return (state & 0x8000) and (state & 1)

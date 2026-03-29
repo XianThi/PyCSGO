@@ -1,5 +1,6 @@
 import math
 
+
 class Vec(object):
     def __init__(self, x, y, z):
         self.x = x
@@ -49,4 +50,4 @@ class Vec(object):
             return Vec(self.x / v, self.y / v, self.z / v)
 
     def __str__(self):
-        return '[ %.4f, %.4f, %.4f ]' % (self.x, self.y, self.z)
+        return "[ %.4f, %.4f, %.4f ]" % (self.x, self.y, self.z)

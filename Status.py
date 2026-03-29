@@ -2,7 +2,7 @@ class Status:
     def _displayMessage(self, message, level = None):
         # This can be modified easily
         if level is not None:
-            print ("[%s] %s [%s]" % (level, message,level))
+            print ("[%s] %s " % (level, message))
         else:
             print ("[default] %s" % (message))
 

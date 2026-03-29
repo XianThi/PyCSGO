@@ -5,20 +5,23 @@ from Overlay import AntiDetectionOverlay
 from Status import Status
 import threading
 
-#SABITLER
+# SABITLER
 WIDTH, HEIGHT = 1920, 1080
 status = Status()
 config = GameConfig()
 
+
 def main():
     status.debug("CS2 External Cheat")
     status.debug("Updating Offsets...")
-    config.UpdateFromGithub("https://raw.githubusercontent.com/a2x/cs2-dumper/refs/heads/main/output/offsets.json")
+    config.UpdateFromGithub(
+        "https://raw.githubusercontent.com/a2x/cs2-dumper/refs/heads/main/output/offsets.json"
+    )
     mem = Memory()
     status.debug("Attaching to process...")
     if not mem.attach("cs2.exe"):
         status.info("cs2.exe not found")
-        #return
+        return
     status.debug("cs2.exe found. getting modules...")
     if not mem.update_modules():
         status.info("Modules not found")
@@ -33,9 +36,11 @@ def main():
     overlay = AntiDetectionOverlay(cache=cache, WIDTH=WIDTH, HEIGHT=HEIGHT)
     overlay.run()
 
+
 def memory_loop(cache):
     while True:
         cache.refresh()
+
 
 if __name__ == "__main__":
     main()
