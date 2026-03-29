@@ -64,8 +64,9 @@ class Esp:
         (x1, y1), (x2, y2) = bounds
 
         # BOX
-        if True:  # cfg::esp::box
-            color = (0,0,255) if mate else (255,0,0)
+        if True: 
+            pass
+            #color = (0,0,255) if mate else (255,0,0)
             #pygame.draw.rect(screen, color, (x1, y1, x2-x1, y2-y1), 1)
 
         # SKELETON
