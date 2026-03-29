@@ -124,7 +124,7 @@ class AntiDetectionOverlay:
         
         pygame.quit()
         sys.exit()
-
+    
     def is_pressed(self, vk):
         state = win32api.GetAsyncKeyState(vk)
         return (state & 0x8000) and (state & 1)

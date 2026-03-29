@@ -1,6 +1,6 @@
 from Cache import Snapshot
 from Player import Player
-from Utils import world_to_screen
+from Utils import distance, world_to_screen
 import pygame
 
 WIDTH, HEIGHT = 1920, 1080
@@ -24,6 +24,7 @@ CONNECTIONS = [
 class Esp:
     def __init__(self):
         self.font = pygame.font.SysFont("consolas", 14)
+        self.mode = "full" # full, skeleton, head, box
 
     def render(self, screen, snap:Snapshot):
         if not snap.options.glowESPEnabled:
@@ -38,51 +39,87 @@ class Esp:
         for p in players:
             if not p.alive:
                 continue
-
             if p.localplayer:
                 local_team = p.team
                 localplayer = p
                 continue
-
         for p in players:
             if not p.alive or p.localplayer:
                 continue
-
+            if localplayer is None or localplayer.pos is None or p is None or p.pos is None:
+                continue
+            dist = distance(localplayer.pos, p.pos)
+            if dist < 500:
+                self.mode = "full"
+            elif dist < 1000:
+                self.mode = "normal"
+            else:
+                self.mode = "minimal"
             mate = (p.team == local_team)
-
-            self.render_player(screen, p, vm, mate)
+            if mate:
+                continue
+            self.render_with_mode(screen, vm, p, mate, dist)
+            #self.render_player(screen, p, vm, mate)
 
         # extra
         if snap.bomb:
             self.render_bomb(screen, snap.bomb, vm, localplayer)
-    
-    def render_player(self, screen, p:Player, vm, mate):
+    def get_head_radius(self, width, dist):
+        base = int(width / 6)
+
+        if dist > 1000:
+            return max(4, base)  # minimum garanti
+        elif dist > 500:
+            return max(3, base)
+        else:
+            return base
+    def get_thickness(self,dist):
+        if dist < 400:
+            return 2
+        elif dist < 1000:
+            return 2
+        else:
+            return 3  # uzak = daha kalın
+    def render_with_mode(self, screen, vm, p, mate,dist=0):
+        if self.mode == "full":
+            self.render_player(screen, p, vm, mate,dist)
+        elif self.mode == "normal":
+            self.render_skeleton(screen, p, vm, mate,dist)
+        elif self.mode == "minimal":
+            bounds = p.get_bounds(vm, (WIDTH, HEIGHT), world_to_screen)
+            if not bounds:
+                return
+            (x1, y1), (x2, y2) = bounds
+            self.render_head(screen, p, bounds, vm, mate,dist)
+
+    def render_player(self, screen, p:Player, vm, mate,dist=0):
         bounds = p.get_bounds(vm, (WIDTH, HEIGHT), world_to_screen)
         if not bounds:
             return
 
         (x1, y1), (x2, y2) = bounds
 
+        thickness =self.get_thickness(dist)
         # BOX
         if True: 
             pass
-            #color = (0,0,255) if mate else (255,0,0)
-            #pygame.draw.rect(screen, color, (x1, y1, x2-x1, y2-y1), 1)
+            color = (0,0,255) if mate else (255,0,0)
+            pygame.draw.rect(screen, color, (x1, y1, x2-x1, y2-y1), thickness)
 
         # SKELETON
         if True:
-            self.render_skeleton(screen, p, vm, mate)
+            self.render_skeleton(screen, p, vm, mate,dist)
 
         # HEAD TRACKER
-        self.render_head(screen, p, bounds, vm, mate)
+        self.render_head(screen, p, bounds, vm, mate,dist)
 
         # HP BAR
         self.render_health(screen, p, bounds)
 
         # NAME
-        #self.render_name(screen, p, bounds)
+        self.render_name(screen, p, bounds)
 
-    def render_skeleton(self, screen, p, vm, mate):
+    def render_skeleton(self, screen, p, vm, mate,dist=0):
         color = (0,255,255) if mate else (255,255,0)
 
         for b1, b2 in CONNECTIONS:
@@ -98,9 +135,10 @@ class Esp:
 
             if not s1 or not s2:
                 continue
-
-            pygame.draw.line(screen, color, s1, s2, 1)
-    def render_head(self, screen, p, bounds, vm, mate):
+            thickness =self.get_thickness(dist)
+            pygame.draw.line(screen, color, s1, s2, thickness)
+    
+    def render_head(self, screen, p, bounds, vm, mate,dist=0):
         if not p.bone_list:
             return
 
@@ -112,10 +150,10 @@ class Esp:
 
         (x1, y1), (x2, y2) = bounds
         width = x2 - x1
-
         color = (0,255,0) if mate else (255,0,0)
-
-        pygame.draw.circle(screen, color, screen_pos, int(width/6), 1)
+        radius = self.get_head_radius(width, dist)
+        thickness =self.get_thickness(dist)
+        pygame.draw.circle(screen, color, screen_pos, radius, thickness)
     
     def render_health(self, screen, p, bounds):
         (x1, y1), (x2, y2) = bounds
