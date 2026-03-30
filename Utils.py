@@ -1,3 +1,32 @@
+class RenderPlayer:
+    __slots__ = ('pos', 'health', 'team', 'name', 'alive', 'bone_list', 'localplayer', 'weapon')
+    def __init__(self, player):
+        self.pos = player.pos
+        self.health = player.health
+        self.team = player.team
+        self.name = player.name
+        self.alive = player.alive
+        self.bone_list = player.bone_list.copy()  # kopya
+        self.localplayer = player.localplayer
+        self.weapon = player.weapon
+
+    def get_bounds(self, view_matrix, screen_size, w2s_func):
+        # Aynı Player.get_bounds kodu
+        origin = w2s_func(self.pos, view_matrix, screen_size)
+        if not origin:
+            return None
+        top_pos = self.bone_list[6] if self.bone_list else (self.pos[0], self.pos[1], self.pos[2] + 65)
+        top = w2s_func(top_pos, view_matrix, screen_size)
+        if not top:
+            return None
+        height = origin[1] - top[1]
+        width = height / 2.4
+        x1 = top[0] - width / 2
+        y1 = top[1] - width / 4
+        x2 = origin[0] + width / 2
+        y2 = origin[1]
+        return (x1, y1), (x2, y2)
+
 def world_to_screen(pos, view_matrix, screen_size):
     x = pos[0]
     y = pos[1]

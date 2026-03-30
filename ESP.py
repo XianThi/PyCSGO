@@ -45,14 +45,14 @@ class Esp:
                 localplayer = p
                 continue
         for p in players:
-            if not p.alive or p.localplayer:
-                continue
             if (
                 localplayer is None
                 or localplayer.pos is None
                 or p is None
                 or p.pos is None
             ):
+                continue
+            if not p.alive or p.localplayer:
                 continue
             dist = distance(localplayer.pos, p.pos)
             mate = p.team == local_team

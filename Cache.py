@@ -1,3 +1,4 @@
+import threading
 import time
 
 import keyboard
@@ -7,6 +8,7 @@ from Game import Game
 from Globals import Globals
 from Offsets import GameOptions
 from Player import Player
+from Utils import RenderPlayer
 
 
 class Snapshot:
@@ -35,51 +37,62 @@ class Cache:
         self.bomb = Bomb(mem, offsets)
         self.globals = Globals(mem, offsets)
 
-        self.players = []
-
         self.last = 0
-        self.refresh_delay = 0.005  # 5ms
+        self.refresh_delay = 0.016  # 60 FPS
+        self.last_entity_update = 0
+        self.entity_update_interval = 0.2  # 200 ms
 
         self.esp_enabled = self.options.glowESPEnabled
         self.trigger_bot_enabled = self.options.triggerBotEnabled
         self.auto_bhop_enabled = self.options.autoBHOPEnabled
         self.sound_esp_enabled = self.options.soundESPEnabled
         self.rcs_enabled = self.options.rcsEnabled
+        self._player_cache = {}
+        self._player_list: list[Player] = []
+        self._player_lock = threading.Lock()
 
     # =========================
+    @property
+    def players(self):
+        with self._player_lock:
+            return self._player_list.copy()
 
     def refresh(self):
         if not self.mem.pm:
             return False
-
-        now = time.time()
-
         # view matrix her frame
         if not self.game.update():
             return False
+        now = time.time()
+        if now - self.last_entity_update > self.entity_update_interval:
+            self.game.update_entity_list()
+            self.last_entity_update = now
 
         # rate limit
         if now - self.last < self.refresh_delay:
             return True
 
         # heavy updates
-        self.game.update_entity_list()
         self.globals.update()
         self.bomb.update()
-
-        scan = []
+        valid_indices = set()
 
         for i in range(self.globals.max_clients):
-            player = Player(i, self.game.list_entry, self.mem, self.offsets)
+            player = self._player_cache.get(i)
+            if player is None:
+                player = Player(i, self.game.list_entry, self.mem, self.offsets)
+                self._player_cache[i] = player
 
             if not player.update():
+                # Oyuncu geçersizse (ölü, bağlantısı kopmuş vs.) listeden çıkar, ama cache'de tut (belki geri gelir)
                 continue
 
-            scan.append(player)
+            valid_indices.add(i)
+        with self._player_lock:
+            self._player_list = [self._player_cache[i] for i in valid_indices]
 
-        # swap
-        self.players = scan
         self.last = now
+        # toggle kontrolleri vs...
         if keyboard.is_pressed("f1"):
             self.esp_enabled = not self.esp_enabled
             time.sleep(0.2)  # debounce
@@ -109,6 +122,6 @@ class Cache:
             self.rcs_enabled = not self.rcs_enabled
 
     def snapshot(self):
-        return Snapshot(
-            self.game, self.bomb, self.globals, self.players.copy(), self.options
-        )
+        with self._player_lock:
+            render_players = [RenderPlayer(p) for p in self._player_list]
+        return Snapshot(self.game, self.bomb, self.globals, render_players, self.options)

@@ -42,13 +42,15 @@ class Memory:
     def read_float(self, addr):
         return struct.unpack("<f", self.pm.read_bytes(addr, 4))[0]
 
+    # def read_vec3(self, addr):
+    #     return (
+    #         self.read_float(addr),
+    #         self.read_float(addr + 4),
+    #         self.read_float(addr + 8),
+    #     )
     def read_vec3(self, addr):
-        return (
-            self.read_float(addr),
-            self.read_float(addr + 4),
-            self.read_float(addr + 8),
-        )
-
+        data = self.pm.read_bytes(addr, 12)
+        return struct.unpack("<fff", data)
     def read_bool(self, addr):
         return struct.unpack("<?", self.pm.read_bytes(addr, 1))[0]
 
